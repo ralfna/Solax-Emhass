@@ -107,7 +107,10 @@ For visualization, an **ApexCharts card** shows:
 - Grid & battery power forecasts
 
 Below is an example configuration snippet:
+<details>
+<summary>📈 ApexCharts – MPC Forecast Visualization</summary>
 
+```yaml
 type: custom:apexcharts-card
 experimental:
   color_threshold: true
@@ -200,6 +203,10 @@ series:
       return entity.attributes.battery_scheduled_power.map((entry) => {
         return [new Date(entry.date), entry.p_batt_forecast];
       });
+
+```
+
+</details>
 
 ...
 
