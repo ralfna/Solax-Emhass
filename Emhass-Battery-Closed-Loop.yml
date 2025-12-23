@@ -1,0 +1,156 @@
+alias: EMHASS – Batterie Closed Loop (60s) Mode 8
+description: Steuerung der Batterie basierend auf MPC Forecast, PV und Hauslast, Mode 8 is momentary not working on my system so back to mode 1
+triggers:
+  - minutes: /1
+    trigger: time_pattern
+conditions:
+  - condition: state
+    entity_id: input_boolean.emhass_mpc_ready
+    state: "on"
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ soc_now <= 22 }}"
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.lade_automations_status
+            data:
+              value: ⚠️ SOC NOTSTOP (<22%) – RemoteControl AUS
+          - action: select.select_option
+            target:
+              entity_id: select.qcells_remotecontrol_power_control
+            data:
+              option: Disabled
+          - action: number.set_value
+            target:
+              entity_id: number.qcells_remotecontrol_autorepeat_duration
+            data:
+              value: 75
+          - action: button.press
+            target:
+              entity_id: button.qcells_remotecontrol_trigger
+          - stop: SOC unter Sicherheitsgrenze
+      - conditions:
+          - condition: template
+            value_template: "{{ p_batt < -50 and soc_now < soc_target - 0.1 }}"
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.lade_automations_status
+            data:
+              value: 🔌 Laden gestartet (MPC)
+          - action: select.select_option
+            target:
+              entity_id: select.qcells_remotecontrol_power_control
+            data:
+              option: Enabled Grid Control
+          - action: number.set_value
+            target:
+              entity_id: number.qcells_remotecontrol_active_power
+            data:
+              value: "{{ grid_power }}"
+          - action: number.set_value
+            target:
+              entity_id: number.qcells_remotecontrol_autorepeat_duration
+            data:
+              value: 75
+          - action: button.press
+            target:
+              entity_id: button.qcells_remotecontrol_trigger
+      - conditions:
+          - condition: template
+            value_template: "{{ p_batt < -50 and soc_now >= soc_target - 0.1 }}"
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.lade_automations_status
+            data:
+              value: SOC Ziel erreicht – Halten (Mode 8)
+          - action: select.select_option
+            target:
+              entity_id: select.qcells_remotecontrol_power_control
+            data:
+              option: Enabled No Discharge
+          - action: number.set_value
+            target:
+              entity_id: number.qcells_remotecontrol_autorepeat_duration
+            data:
+              value: 75
+          - action: button.press
+            target:
+              entity_id: button.qcells_remotecontrol_trigger
+      - conditions:
+          - condition: template
+            value_template: "{{ p_batt | abs < 50 }}"
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.lade_automations_status
+            data:
+              value: 🔒 Batterie halten (Mode 8 – Überschuss speichern)
+          - action: select.select_option
+            target:
+              entity_id: select.qcells_remotecontrol_power_control
+            data:
+              option: Enabled No Discharge
+          - action: number.set_value
+            target:
+              entity_id: number.qcells_remotecontrol_autorepeat_duration
+            data:
+              value: 75
+          - action: button.press
+            target:
+              entity_id: button.qcells_remotecontrol_trigger
+      - conditions:
+          - condition: template
+            value_template: "{{ p_batt > 50 }}"
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.lade_automations_status
+            data:
+              value: ⚙️ Normalbetrieb (MPC)
+          - action: select.select_option
+            target:
+              entity_id: select.qcells_remotecontrol_power_control
+            data:
+              option: Disabled
+          - action: number.set_value
+            target:
+              entity_id: number.qcells_remotecontrol_autorepeat_duration
+            data:
+              value: 75
+          - action: button.press
+            target:
+              entity_id: button.qcells_remotecontrol_trigger
+    default:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.lade_automations_status
+        data:
+          value: Fallback – Normalbetrieb
+      - action: select.select_option
+        target:
+          entity_id: select.qcells_remotecontrol_power_control
+        data:
+          option: Disabled
+      - action: number.set_value
+        target:
+          entity_id: number.qcells_remotecontrol_autorepeat_duration
+        data:
+          value: 75
+      - action: button.press
+        target:
+          entity_id: button.qcells_remotecontrol_trigger
+variables:
+  p_batt: "{{ states('sensor.p_batt_forecast') | float(0) }}"
+  soc_now: "{{ states('sensor.qcells_battery_capacity') | float(0) }}"
+  soc_target: "{{ states('sensor.soc_batt_forecast') | float(0) }}"
+  pv_now: "{{ states('sensor.qcells_pv_power_total') | float(0) }}"
+  load_now: "{{ states('sensor.qcells_house_load') | float(0) }}"
+  max_grid: 8000
+  grid_power_raw: "{{ (-p_batt) + load_now - pv_now }}"
+  grid_power: "{{ [0, [grid_power_raw, max_grid] | min] | max | round(0) }}"
+mode: single
