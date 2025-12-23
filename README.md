@@ -3,6 +3,7 @@
 ![EMHASS](https://img.shields.io/badge/EMHASS-Integrated-green)
 ![License](https://img.shields.io/github/license/ralfna/Solax-Emhass)
 ![Last Commit](https://img.shields.io/github/last-commit/ralfna/Solax-Emhass)
+
 Automated energy management for a **Qcells/SolaX X3 Hybrid inverter** using **EMHASS (Energy Management for Home Assistant)** and Home Assistant automations.
 
 This repository contains Home Assistant configurations, sensors, MPC (Model Predictive Control) payload templates, and battery management automations that optimize solar usage with price forecasts via EMHASS.
