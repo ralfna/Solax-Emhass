@@ -1,0 +1,22 @@
+alias: Emhass Publish
+description: ""
+triggers:
+  - trigger: time_pattern
+    minutes: /5
+conditions: []
+actions:
+  - action: rest_command.emhass_publish_data
+    metadata: {}
+    data: {}
+    response_variable: rest_response
+  - if:
+      - condition: template
+        value_template: "{{ rest_response['status'] > 400  }}"
+    then:
+      - metadata: {}
+        data:
+          level: warning
+          message: "{{ rest_response['content'] }}"
+          logger: EMHASS.MINUTE
+        action: system_log.write
+mode: single
