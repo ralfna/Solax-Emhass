@@ -1,0 +1,38 @@
+alias: EMHASS - naive mpc optim forecast
+description: EMHASS - naive mpc optimization - upto 48 hours forecast.
+triggers:
+  - minutes: /15
+    trigger: time_pattern
+conditions:
+  - condition: or
+    conditions:
+      - condition: time
+        before: "05:30:00"
+      - condition: time
+        after: "06:00:00"
+actions:
+  - target:
+      entity_id: input_boolean.emhass_mpc_ready
+    action: input_boolean.turn_off
+  - delay: "00:00:01"
+  - continue_on_error: true
+    response_variable: rest_response
+    action: rest_command.emhass_naive_mpc_optim_forecast
+  - if:
+      - condition: template
+        value_template: "{{ rest_response is defined and rest_response['status'] < 400 }}"
+    then:
+      - action: rest_command.emhass_publish_data
+      - delay: "00:00:01"
+      - target:
+          entity_id: input_boolean.emhass_mpc_ready
+        action: input_boolean.turn_on
+    else:
+      - data:
+          level: warning
+          logger: EMHASS.MINUTE
+          message: >
+            EMHASS MPC Fehler: {{ rest_response['content'] if rest_response is
+            defined else 'keine Antwort' }}
+        action: system_log.write
+mode: single
