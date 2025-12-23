@@ -55,9 +55,9 @@ This setup assumes:
 The MPC controller uses:
 
 - PV forecast (e.g., Solcast)
-- Load forecast
+- Load forecast (ML-predict sensor)
 - Price forecast (EPEX/Nord Pool)
-- Battery SOC  
+- Battery SOC  (Solax Modbus sensor)
 - Cost minimization objective (`costfun = cost`)
 
 The payload sensor builds the EMHASS API call and sends it every 15 minutes.
@@ -88,7 +88,7 @@ Each dict entry contains explicit timestamps, allowing robust time arithmetic wi
 This automation reads:
 
 - `sensor.p_batt_forecast`  
-- `sensor.soc_batt_forecast`  
+- `sensor.soc_batt_forecast`  from dayahead
 - PV & load sensors  
 
 and adjusts the inverter remote control accordingly every minute.
@@ -109,8 +109,100 @@ For visualization, an **ApexCharts card** shows:
 Below is an example configuration snippet:
 
 type: custom:apexcharts-card
+experimental:
+  color_threshold: true
+graph_span: 6h
+span:
+  start: minute
+now:
+  show: true
+  label: now
+  color: red
+yaxis:
+  - id: first
+    decimals: 2
+    apex_config:
+      forceNiceScale: true
+  - id: second
+    opposite: true
+    min: -4000
+    max: 8000
+    decimals: 0
+    apex_config:
+      forceNiceScale: true
+header:
+  show: true
+  title: Energy flow
+  show_states: true
+  colorize_states: true
+series:
+  - entity: sensor.epex_spot_data_total_price_3
+    yaxis_id: first
+    curve: stepline
+    float_precision: 2
+    show:
+      in_header: after_now
+    stroke_width: 1
+    name: price kWh
+    data_generator: |
+      return entity.attributes.data.map((entry) => {
+        return [new Date(entry.start_time), entry.price_per_kwh];
+      });
+  - entity: sensor.p_pv_forecast
+    yaxis_id: second
+    curve: stepline
+    show:
+      in_header: before_now
+    stroke_width: 1
+    name: PV Forecast
+    color: rgb(255,215,0)
+    data_generator: |
+      return entity.attributes.forecasts.map((entry) => {
+        return [new Date(entry.date), entry.p_pv_forecast];
+      });
+  - entity: sensor.p_load_forecast
+    yaxis_id: second
+    curve: stepline
+    show:
+      in_header: before_now
+    stroke_width: 1
+    name: Load Forecast
+    color: rgb(255,0,0)
+    data_generator: |
+      return entity.attributes.forecasts.map((entry) => {
+        return [new Date(entry.date), entry.p_load_forecast];
+      });
+  - entity: sensor.p_grid_forecast
+    yaxis_id: second
+    curve: stepline
+    opacity: 0.1
+    color: rgb(0,255,255)
+    type: area
+    show:
+      in_header: before_now
+    stroke_width: 1
+    name: Grid Forecast
+    data_generator: |
+      return entity.attributes.forecasts.map((entry) => {
+        return [new Date(entry.date), entry.p_grid_forecast];
+      });
+  - entity: sensor.p_batt_forecast
+    yaxis_id: second
+    curve: stepline
+    opacity: 0.1
+    color: green
+    type: area
+    show:
+      in_header: before_now
+    stroke_width: 1
+    name: Batt Forecast
+    data_generator: |
+      return entity.attributes.battery_scheduled_power.map((entry) => {
+        return [new Date(entry.date), entry.p_batt_forecast];
+      });
+
 ...
-# (chart YAML here)
+
 
 
 You can add additional panels for day-ahead MPC outputs and SOC forecast.
