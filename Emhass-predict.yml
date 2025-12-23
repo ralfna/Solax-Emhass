@@ -1,0 +1,24 @@
+alias: Emhass ML predict
+description: ""
+triggers:
+  - trigger: time
+    at: "05:28:00"
+conditions: []
+actions:
+  - action: rest_command.emhass_mlforecast_predict
+    metadata: {}
+    data: {}
+    response_variable: rest_response
+  - if:
+      - condition: template
+        value_template: "{{ rest_response['status'] < 400  }}"
+    then:
+      - action: rest_command.emhass_publish_data
+    else:
+      - metadata: {}
+        data:
+          level: warning
+          message: "{{ rest_response['content'] }}"
+          logger: EMHASS.MINUTE
+        action: system_log.write
+mode: single
