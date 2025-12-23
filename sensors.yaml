@@ -1,0 +1,107 @@
+
+    
+template:
+  - sensor:
+      - name: "emhass_epex_forecast"
+        icon: mdi:script
+        state: "{{ now() }}"  # Irgendein gültiger state, wird von EMHASS ignoriert
+        attributes:
+          load_cost_forecast: >
+            {% set items = state_attr('sensor.epex_spot_data_total_price_3', 'data') %}
+            {% if not items %}
+              {}
+            {% else %}
+              {%- set ns = namespace(out={}) -%}
+              {%- for i in items -%}
+                {%- set ts = as_datetime(i.start_time).strftime('%Y-%m-%d %H:%M:%S%z') -%}
+                {%- set ts = ts[:-2] ~ ':' ~ ts[-2:] %} {# formatiert +0100 → +01:00 #}
+                {%- set ns.out = ns.out | combine({ ts: i.price_per_kwh }) -%}
+              {%- endfor -%}
+              {{ ns.out }}
+            {% endif %}
+
+  - sensor:
+      - name: "emhass_load_forecast_dict_local"
+        state: "{{ now() }}"
+        attributes:
+          load_forecast: >
+            {% set items = state_attr('sensor.p_load_forecast_custom_model', 'scheduled_forecast') %}
+            {% if not items %}
+              {}
+            {% else %}
+              {%- set ns = namespace(out={}) -%}
+              {%- for i in items -%}
+                {# parse original, convert to local timezone #}
+                {%- set dt = as_local(as_datetime(i.date)) -%}
+                {%- set ts = dt.strftime('%Y-%m-%d %H:%M:%S%z') -%}
+                {%- set ts = ts[:-2] ~ ':' ~ ts[-2:] -%}
+                {%- set val = (i.p_load_forecast_custom_model | float) -%}
+                {%- set ns.out = ns.out | combine({ ts: val }) -%}
+              {%- endfor -%}
+              {{ ns.out }}
+            {% endif %}    
+            
+  - sensor:
+      - name: "emhass_solcast_pv_forecast"
+        icon: mdi:solar-power
+        state: "{{ now() }}"
+        attributes:
+          pv_power_forecast: >
+            {% set heute = state_attr('sensor.solcast_pv_forecast_prognose_heute', 'detailedForecast') or [] %}
+            {% set morgen = state_attr('sensor.solcast_pv_forecast_prognose_morgen', 'detailedForecast') or [] %}
+            {% set items = heute + morgen %}
+            {% if not items %}
+              {}
+            {% else %}
+              {%- set ns = namespace(out={}) -%}
+              {%- for i in items -%}
+                {%- set dt = as_datetime(i.period_start) -%}
+                {%- if dt -%}
+                  {%- set ts = dt.strftime('%Y-%m-%d %H:%M:%S%z') -%}
+                  {%- set ts = ts[:-2] ~ ':' ~ ts[-2:] -%} {# formatiert +0100 → +01:00 #}
+                  {%- set ns.out = ns.out | combine({ ts: (i.pv_estimate | float |multiply(1000) ) }) -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {{ ns.out }}
+            {% endif %}
+            
+  - sensor:
+      - name: "emhass_mpc_payload"
+        state: "{{ now() }}"
+        attributes:
+          payload: >
+            {% set pv_attr = state_attr('sensor.emhass_solcast_pv_forecast', 'pv_power_forecast') or {} %}
+            {% set load_attr = state_attr('sensor.emhass_load_forecast_dict_local', 'load_forecast') or {} %}
+            {% set price_attr = state_attr('sensor.emhass_epex_forecast', 'load_cost_forecast') or {} %}
+            {% set soc_init = (states('sensor.qcells_battery_capacity') | float(0)) / 100 %}
+            {# --- dynamisches soc_final abhängig von dayahead Lauf --- #}
+            {# Prediction horizon: 4h = 16 * 15min steps #}
+            {% set prediction_horizon_steps = 16 %}
+            {% set horizon_end_ts = as_timestamp(now()) + prediction_horizon_steps * 15 * 60 %}
+
+            {% set dayahead = state_attr('sensor.dayaheadsoc_batt_forecast', 'battery_scheduled_soc') or [] %}
+            {% set ns = namespace(best_diff=999999, best_soc=none) %}
+
+            {% for i in dayahead %}
+              {% set dt = as_timestamp(as_datetime(i.date)) %}
+              {% set diff = (dt - horizon_end_ts) | abs %}
+              {% if diff < ns.best_diff %}
+                {% set ns.best_diff = diff %}
+                {% set ns.best_soc = (i.dayaheadsoc_batt_forecast | float(50)) / 100 %}
+              {% endif %}
+            {% endfor %}
+
+            {% set soc_final = ns.best_soc if ns.best_soc is not none else soc_init %}
+            
+            {# Build payload dict #}
+            {% set payload = {
+              "pv_power_forecast": pv_attr,
+              "load_power_forecast": load_attr,
+              "load_cost_forecast": price_attr,
+              "prediction_horizon": prediction_horizon_steps,
+              "soc_init": soc_init,
+              "soc_final": soc_final
+                          } %}
+            {{ payload | tojson }}
+
+
