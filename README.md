@@ -1,7 +1,6 @@
 # Solax-EMHASS
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Compatible-blue)
 ![EMHASS](https://img.shields.io/badge/EMHASS-Integrated-green)
-![License](https://img.shields.io/github/license/ralfna/Solax-Emhass)
 ![Last Commit](https://img.shields.io/github/last-commit/ralfna/Solax-Emhass)
 
 Automated energy management for a **Qcells/SolaX X3 Hybrid inverter** using **EMHASS (Energy Management for Home Assistant)** and Home Assistant automations.
