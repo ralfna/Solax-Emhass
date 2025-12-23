@@ -1,0 +1,26 @@
+alias: Emhass Day ahead
+description: ""
+triggers:
+  - trigger: time
+    at: "05:38:00"
+conditions: []
+actions:
+  - action: rest_command.emhass_dayahead
+    metadata: {}
+    data: {}
+    response_variable: rest_response
+  - if:
+      - condition: template
+        value_template: "{{ rest_response['status'] < 400  }}"
+    then:
+      - action: rest_command.emhass_publish_data
+        data:
+          publish_prefix: dayahead
+    else:
+      - metadata: {}
+        data:
+          level: warning
+          message: "{{ rest_response['content'] }}"
+          logger: EMHASS.MINUTE
+        action: system_log.write
+mode: single
