@@ -79,5 +79,7 @@ rest_command:
     method: POST
     content_type: 'application/json'
     payload: >-
-      {"publish_prefix": {{ "" }}}
+      {"publish_prefix": "{{ prefix | default('') }}"}
+
+
 
