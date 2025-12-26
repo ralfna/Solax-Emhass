@@ -15,7 +15,7 @@ actions:
     then:
       - action: rest_command.emhass_publish_data
         data:
-          publish_prefix: dayahead
+          prefix: dayahead
     else:
       - metadata: {}
         data:
@@ -24,3 +24,4 @@ actions:
           logger: EMHASS.MINUTE
         action: system_log.write
 mode: single
+
