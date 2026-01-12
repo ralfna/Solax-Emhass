@@ -47,6 +47,7 @@ rest_command:
     payload: >
       {
         "model_type": "long_train_data",
+        "var_model": "sensor.qcells_house_load",
         "model_predict_publish": true,
         "model_predict_entity_id": "sensor.p_load_forecast_custom_model",
         "model_predict_unit_of_measurement": "W",
@@ -80,6 +81,7 @@ rest_command:
     content_type: 'application/json'
     payload: >-
       {"publish_prefix": "{{ prefix | default('') }}"}
+
 
 
 
