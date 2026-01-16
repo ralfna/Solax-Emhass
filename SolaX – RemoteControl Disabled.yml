@@ -1,0 +1,17 @@
+alias: SolaX – RemoteControl Disabled
+mode: queued
+sequence:
+  - target:
+      entity_id: select.qcells_remotecontrol_power_control_mode
+    data:
+      option: Disabled
+    action: select.select_option
+  - target:
+      entity_id: number.qcells_remotecontrol_autorepeat_duration
+    data:
+      value: 75
+    action: number.set_value
+  - target:
+      entity_id: button.qcells_powercontrolmode8_trigger
+    action: button.press
+description: Hard Disable aller RemoteControl-Modi (Notstopp / Entladen)
