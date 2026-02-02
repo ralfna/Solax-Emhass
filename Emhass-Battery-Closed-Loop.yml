@@ -1,5 +1,7 @@
-alias: EMHASS – Batterie Closed Loop (Mode 8 Script)
-description: MPC Closed Loop mit Mode 8 (Laden/Halten), Entladen = Disabled, SOC-Notstopp
+alias: EMHASS – Batterie Closed Loop (Mode 8 Script v2.3)
+description: >-
+  MPC Closed Loop mit Mode 8 (Laden/Halten), Entladen = Disabled, SOC-Notstopp
+  mit Recovery-Latch, 25%-Stabilisierung
 triggers:
   - minutes: /1
     trigger: time_pattern
@@ -11,42 +13,109 @@ actions:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ soc_now <= 22 }}"
+            value_template: "{{ soc_now < 20 }}"
+          - condition: state
+            entity_id: input_boolean.batt_soc_recovery
+            state: "off"
         sequence:
-          - target:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.batt_soc_recovery
+          - action: input_text.set_value
+            target:
               entity_id: input_text.lade_automations_status
             data:
-              value: 🛑 SOC Notstopp – RemoteControl Disabled
-            action: input_text.set_value
-          - action: script.solax_remotecontrol_disabled
-          - stop: SOC Notstopp
+              value: 🔁 SOC Recovery gestartet ({{ soc_now | round(1) }}%)
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.batt_soc_recovery
+            state: "on"
+          - condition: template
+            value_template: "{{ soc_now < 25 }}"
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.lade_automations_status
+            data:
+              value: 🔁 SOC Recovery läuft → Laden ({{ soc_now | round(1) }}%)
+          - action: script.solax_mode8_apply
+            data:
+              active_power: -900
+              duration: 120
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.batt_soc_recovery
+            state: "on"
+          - condition: template
+            value_template: "{{ soc_now >= 25 }}"
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.batt_soc_recovery
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.lade_automations_status
+            data:
+              value: ✅ SOC Recovery beendet ({{ soc_now | round(1) }}%)
       - conditions:
           - condition: template
-            value_template: "{{ p_batt > 50 }}"
+            value_template: "{{ soc_now <= 25 }}"
         sequence:
-          - target:
-              entity_id: input_text.lade_automations_status
-            data:
-              value: ⚡ Entladen erkannt → RemoteControl Disabled
-            action: input_text.set_value
-          - action: script.solax_remotecontrol_disabled
-      - conditions: []
-        sequence:
-          - target:
+          - action: input_text.set_value
+            target:
               entity_id: input_text.lade_automations_status
             data:
               value: |
                 {% if active_power < 0 %}
-                  🔌 Mode 8 – Laden
+                  🔌 Mode 8 – Laden unter 25%
                 {% else %}
-                  🔒 Mode 8 – Halten (Freeze Charge)
+                  🔒 Mode 8 – Halten unter 25%
                 {% endif %}
-            action: input_text.set_value
-          - data:
+          - action: script.solax_mode8_apply
+            data:
               active_power: "{{ active_power }}"
               duration: 75
-            action: script.solax_mode8_apply
-mode: single
+      - conditions:
+          - condition: template
+            value_template: "{{ p_batt > 50 }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ soc_now <= soc_target }}"
+                sequence:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: input_text.lade_automations_status
+                    data:
+                      value: 🔒 SOC-Ziel erreicht → Halten
+                  - action: script.solax_mode8_apply
+                    data:
+                      active_power: 0
+                      duration: 75
+            default:
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.lade_automations_status
+                data:
+                  value: ⚡ Entladen erlaubt (SOC {{ soc_now | round(1) }}%)
+              - action: script.solax_remotecontrol_disabled
+      - conditions: []
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.lade_automations_status
+            data:
+              value: |
+                {% if active_power < 0 %}
+                  🔌 Mode 8 – Laden (SOC {{ soc_now | round(1) }}%)
+                {% else %}
+                  🔒 Mode 8 – Halten (SOC {{ soc_now | round(1) }}%)
+                {% endif %}
+          - action: script.solax_mode8_apply
+            data:
+              active_power: "{{ active_power }}"
+              duration: 75
 variables:
   p_batt: "{{ states('sensor.p_batt_forecast') | float(0) }}"
   soc_now: "{{ states('sensor.qcells_battery_capacity') | float(0) }}"
@@ -57,3 +126,5 @@ variables:
     {% else %}
       0
     {% endif %}
+mode: single
+
