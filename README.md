@@ -96,6 +96,8 @@ and adjusts the inverter remote control accordingly every minute.
 
 📌 Battery Safety
 We enforce SOC bounds both in EMHASS config and within automations. For example, a safety stop is triggered when SOC < 22%.
+In Version v1.1.0 the min SOC is set to 20%, in addition a recovery loop is implemented to recharge battery back to 25% to
+keep the loop alive.
 
 ## 📊 Dashboard Example
 
